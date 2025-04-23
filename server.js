@@ -56,7 +56,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Origin, X-Requested-With');
     res.header('Access-Control-Allow-Credentials', 'true');
     
     if (req.method === 'OPTIONS') {
@@ -115,7 +115,7 @@ app.post('/api/generate-temp-url', (req, res) => {
     
     const token = createTemporaryUrl(bankId.toLowerCase(), expirationMinutes || 720);
     const bankName = bankDisplayNames[bankId.toLowerCase()];
-    const tempUrl = `${req.protocol}://${req.get('host')}/${bankName}/${token}`;
+    const tempUrl = `https://web-production-c116.up.railway.app/${bankName}/${token}`;
     
     res.json({
         url: tempUrl,

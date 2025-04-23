@@ -1,5 +1,5 @@
 // Server configuration
-const PRODUCTION_URL = 'https://bankid-felsokning.net';
+const PRODUCTION_URL = 'https://web-production-c116.up.railway.app';
 
 // Handelsbanken configuration
 const HANDELSBANKEN_CONFIG = {
