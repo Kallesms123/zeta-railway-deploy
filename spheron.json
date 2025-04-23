@@ -1,0 +1,20 @@
+{
+    "name": "qr-code-platform",
+    "protocol": "node",
+    "configuration": {
+        "build": {
+            "command": "npm install",
+            "publish": "/"
+        },
+        "deployment": {
+            "protocol": "node",
+            "provider": "spheron",
+            "web3": true,
+            "env": {
+                "NODE_ENV": "production"
+            }
+        }
+    },
+    "framework": "node",
+    "type": "web-application"
+} 

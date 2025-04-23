@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Display 2</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+        }
+        .container {
+            text-align: center;
+        }
+        #qrDisplay {
+            max-width: 80vw;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+        .display-id {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #666;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        #status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        .connected { color: #4CAF50; }
+        .disconnected { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="display-id">Display #2</div>
+    <div id="status">Connecting...</div>
+    <div class="container">
+        <img id="qrDisplay" alt="QR Code">
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const qrDisplay = document.getElementById('qrDisplay');
+        const statusDiv = document.getElementById('status');
+        const displayId = '2';
+
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected';
+            statusDiv.className = 'connected';
+            socket.emit('register_display', displayId);
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Disconnected';
+            statusDiv.className = 'disconnected';
+        });
+
+        socket.on('new_qr', (qrData) => {
+            qrDisplay.src = qrData;
+            statusDiv.textContent = 'QR Updated';
+            statusDiv.className = 'connected';
+        });
+
+        // Prevent right-click
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        
+        // Prevent keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.altKey || e.metaKey) {
+                e.preventDefault();
+            }
+        });
+
+        // Keep display awake
+        async function keepAwake() {
+            try {
+                if ('wakeLock' in navigator) {
+                    const wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log('Wake Lock error:', err);
+            }
+        }
+        keepAwake();
+    </script>
+</body>
+</html> 

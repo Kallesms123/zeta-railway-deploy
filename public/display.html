@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Display</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #qrDisplay {
+            max-width: 400px;
+            margin: 20px 0;
+            border: 2px solid #eee;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>QR Code Display</h1>
+        <div id="status" class="status">Connecting...</div>
+        <img id="qrDisplay" alt="QR Code">
+    </div>
+
+    <!-- Socket.IO Client Library -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <script>
+        // Connect to Socket.IO server
+        const socket = io();
+        
+        // Get DOM elements
+        const qrDisplay = document.getElementById('qrDisplay');
+        const statusDiv = document.getElementById('status');
+
+        // Update connection status
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected - Waiting for QR Code';
+            statusDiv.className = 'status connected';
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Disconnected from server';
+            statusDiv.className = 'status disconnected';
+        });
+
+        // Listen for new QR codes
+        socket.on('new_qr', (qrData) => {
+            qrDisplay.src = qrData;
+            statusDiv.textContent = 'QR Code Updated';
+            statusDiv.className = 'status connected';
+        });
+    </script>
+</body>
+</html> 
