@@ -1,6 +1,7 @@
 [build]
   base = "public"
   publish = "/"
+  functions = "netlify/functions"
 
 # Secret admin path - redirects to dashboard
 [[redirects]]
@@ -32,4 +33,16 @@
 [[redirects]]
   from = "/admin.html"
   to = "/404.html"
-  status = 404 
+  status = 404
+
+# API routes - proxy to Netlify Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/qr"
+  status = 200
+
+# Socket.IO fallback - use polling endpoint
+[[redirects]]
+  from = "/socket.io/*"
+  to = "/.netlify/functions/qr"
+  status = 200 
