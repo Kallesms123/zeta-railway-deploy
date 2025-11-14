@@ -33,7 +33,7 @@ npm run dev
 ## 🔗 GitHub Workflow
 
 ### Your Repository
-**GitHub URL:** `https://github.com/martenlarsson09/skolproject.git`
+**GitHub URL:** `https://github.com/Kallesms123/zeta-railway-deploy`
 
 ### Making Changes & Pushing to GitHub
 
@@ -86,7 +86,7 @@ git log --oneline
 ## 🌐 Deployment
 
 The platform is configured for:
-- **Railway.app** (Primary): `web-production-c116.up.railway.app`
+- **Netlify** (Primary): `https://zetarealm.netlify.app`
 - **Vercel** (Alternative)
 - **PM2** (Process manager)
 

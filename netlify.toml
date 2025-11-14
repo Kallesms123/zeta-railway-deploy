@@ -2,7 +2,5 @@
   base = "public"
   publish = "/"
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200 
+# Root shows index.html (loading page)
+# Secret admin path: /zeta-admin-7x9k2m4p8q1w3r5t6y-alpha-control 
