@@ -28,4 +28,7 @@ dist/
 build/
 
 # Vercel
-.vercel 
+.vercel
+
+# QR Scanner Extension (keep local, don't upload)
+qr-scanner-extension/
