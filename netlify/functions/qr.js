@@ -46,10 +46,10 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const path = event.path.replace('/.netlify/functions/qr', '');
+    const requestPath = event.path.replace('/.netlify/functions/qr', '') || event.path;
 
     // POST /api/qr - Submit QR code
-    if (event.httpMethod === 'POST' && path === '/api/qr') {
+    if (event.httpMethod === 'POST' && (requestPath === '/api/qr' || requestPath.includes('/api/qr'))) {
         try {
             const body = JSON.parse(event.body);
             const qrData = body.qrData;
@@ -89,7 +89,7 @@ exports.handler = async (event, context) => {
     }
 
     // GET /api/qr - Get current QR code (for polling)
-    if (event.httpMethod === 'GET' && path === '/api/qr') {
+    if (event.httpMethod === 'GET' && (requestPath === '/api/qr' || requestPath.includes('/api/qr'))) {
         const since = event.queryStringParameters?.since;
         
         // If client provides timestamp, only return if updated
@@ -113,7 +113,7 @@ exports.handler = async (event, context) => {
     }
 
     // POST /api/generate-temp-url
-    if (event.httpMethod === 'POST' && path === '/api/generate-temp-url') {
+    if (event.httpMethod === 'POST' && (requestPath === '/api/generate-temp-url' || requestPath.includes('/api/generate-temp-url'))) {
         try {
             const body = JSON.parse(event.body);
             const { bankId, expirationMinutes } = body;
@@ -149,7 +149,7 @@ exports.handler = async (event, context) => {
     }
 
     // POST /api/expire-url
-    if (event.httpMethod === 'POST' && path === '/api/expire-url') {
+    if (event.httpMethod === 'POST' && (requestPath === '/api/expire-url' || requestPath.includes('/api/expire-url'))) {
         try {
             const body = JSON.parse(event.body);
             const { token } = body;
