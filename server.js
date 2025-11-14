@@ -344,20 +344,27 @@ app.post('/api/qr', (req, res) => {
 
 // New endpoint: Decode QR code from screenshot
 app.post('/api/qr-decode', async (req, res) => {
-    console.log('Received QR decode request from:', req.get('origin'));
+    console.log('📸 Received QR decode request from:', req.get('origin'));
     const screenshot = req.body.screenshot;
     
     if (!screenshot) {
         return res.status(400).json({ error: 'No screenshot provided' });
     }
     
+    // Always broadcast the image to displays, even if decoding fails
+    console.log('📡 Broadcasting QR image to', connectedDisplays.size, 'displays');
+    io.emit('new_qr', screenshot);
+    
     try {
         // Convert base64 image to buffer
         const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
         const imageBuffer = Buffer.from(base64Data, 'base64');
         
+        console.log('🖼️ Image buffer size:', imageBuffer.length, 'bytes');
+        
         // Load image with Jimp
         const image = await Jimp.read(imageBuffer);
+        console.log('✅ Image loaded, dimensions:', image.bitmap.width, 'x', image.bitmap.height);
         
         // Create QR code reader
         const qr = new QrCode();
@@ -366,6 +373,7 @@ app.post('/api/qr-decode', async (req, res) => {
         const qrData = await new Promise((resolve, reject) => {
             qr.callback = (err, value) => {
                 if (err) {
+                    console.log('⚠️ QR decode error:', err.message);
                     reject(err);
                 } else {
                     resolve(value);
@@ -375,10 +383,7 @@ app.post('/api/qr-decode', async (req, res) => {
         });
         
         if (qrData && qrData.result) {
-            console.log('✅ QR code decoded from screenshot:', qrData.result);
-            
-            // Broadcast the QR code image to displays
-            io.emit('new_qr', screenshot);
+            console.log('✅ QR code decoded successfully:', qrData.result.substring(0, 50) + '...');
             
             res.status(200).json({
                 success: true,
@@ -388,16 +393,23 @@ app.post('/api/qr-decode', async (req, res) => {
                 timestamp: new Date().toISOString()
             });
         } else {
+            console.log('⚠️ QR decode returned no result');
             res.status(200).json({
                 success: false,
-                message: 'No QR code found in image'
+                message: 'No QR code found in image (but image was broadcast)',
+                qrData: screenshot, // Still send the image
+                activeDisplays: Array.from(connectedDisplays)
             });
         }
     } catch (error) {
-        console.error('Error decoding QR code:', error);
+        console.error('❌ Error decoding QR code:', error.message);
+        // Still return success since we broadcast the image
         res.status(200).json({
-            success: false,
-            message: 'Could not decode QR code: ' + error.message
+            success: true, // Changed to true since we broadcast the image
+            message: 'QR decode failed but image was broadcast: ' + error.message,
+            qrData: screenshot, // Send the image anyway
+            activeDisplays: Array.from(connectedDisplays),
+            timestamp: new Date().toISOString()
         });
     }
 });
