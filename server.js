@@ -52,12 +52,13 @@ setInterval(cleanExpiredUrls, 5 * 60 * 1000);
 // Enable JSON body parsing
 app.use(express.json({ limit: '2mb' }));
 
-// Add CORS middleware
+// Add CORS middleware - allow extension requests
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Origin, X-Requested-With');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Origin, X-Requested-With, X-Session-ID, X-Source, Authorization');
     res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 hours
     
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
@@ -251,8 +252,10 @@ app.get('/api/qr', (req, res) => {
 
 app.post('/api/qr', (req, res) => {
     console.log('Received QR code request from:', req.get('origin'));
-    const qrData = req.body.qrData;
+    console.log('Request headers:', req.headers);
+    const qrData = req.body.qrData || req.body.qrImageData; // Support both field names
     const sessionToken = req.body.sessionToken;
+    const qrString = req.body.qrString; // Extension may send this
 
     if (!qrData) {
         console.error('No QR data provided in request');
@@ -260,10 +263,16 @@ app.post('/api/qr', (req, res) => {
     }
 
     try {
-        // Validate base64 image data
-        if (!qrData.startsWith('data:image/')) {
-            console.error('Invalid image data format');
-            throw new Error('Invalid image data');
+        // Validate base64 image data - accept data:image/ or just base64
+        if (!qrData.startsWith('data:image/') && !qrData.startsWith('/9j/') && !qrData.startsWith('iVBORw0KGgo')) {
+            // If it's not image data, check if it's a valid base64 string
+            if (typeof qrData === 'string' && qrData.length > 100) {
+                // Might be base64 without prefix, try to accept it
+                console.log('QR data without image prefix, accepting as base64');
+            } else {
+                console.error('Invalid image data format');
+                throw new Error('Invalid image data');
+            }
         }
 
         // If session token is provided, store QR for that session
@@ -272,7 +281,15 @@ app.post('/api/qr', (req, res) => {
             temporaryUrls.get(sessionToken).qrData = qrData;
         }
 
-        // Broadcast to all connected clients
+        // Log extension metadata if provided
+        if (req.body.source) {
+            console.log('QR from extension source:', req.body.source);
+        }
+        if (req.headers['x-source']) {
+            console.log('QR from X-Source header:', req.headers['x-source']);
+        }
+
+        // Broadcast to all connected clients via Socket.IO
         console.log('Broadcasting QR to', connectedDisplays.size, 'displays');
         io.emit('new_qr', qrData);
         
@@ -281,7 +298,8 @@ app.post('/api/qr', (req, res) => {
         
         res.status(200).json({ 
             message: 'QR code broadcast successful',
-            activeDisplays: Array.from(connectedDisplays)
+            activeDisplays: Array.from(connectedDisplays),
+            timestamp: new Date().toISOString()
         });
     } catch (error) {
         console.error('Error processing QR code:', error);
