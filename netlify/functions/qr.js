@@ -128,8 +128,7 @@ exports.handler = async (event, context) => {
 
             const token = createTemporaryUrl(bankId.toLowerCase(), expirationMinutes || 720);
             const bankName = bankId.replace(/\s+/g, '');
-            // TODO: Update with your Railway server URL
-            const tempUrl = `https://your-railway-app.railway.app/${bankName}/${token}`;
+            const tempUrl = `https://web-production-72c0d.up.railway.app/${bankName}/${token}`;
 
             return {
                 statusCode: 200,
