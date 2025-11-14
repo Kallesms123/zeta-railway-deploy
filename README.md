@@ -86,7 +86,7 @@ git log --oneline
 ## 🌐 Deployment
 
 The platform is configured for:
-- **Netlify** (Primary): `https://zetarealm.netlify.app`
+- **Railway** (Primary): Update `config.js` with your Railway domain
 - **Vercel** (Alternative)
 - **PM2** (Process manager)
 

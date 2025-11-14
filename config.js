@@ -1,6 +1,7 @@
 // Server configuration
-const PRODUCTION_DOMAIN = 'zetarealm.netlify.app';
-const PRODUCTION_URL = `https://${PRODUCTION_DOMAIN}`;
+// TODO: Update with your Railway server domain
+const PRODUCTION_DOMAIN = ''; // Update with your Railway domain
+const PRODUCTION_URL = PRODUCTION_DOMAIN ? `https://${PRODUCTION_DOMAIN}` : '';
 
 // Bank-specific URLs
 const BANK_URLS = {
