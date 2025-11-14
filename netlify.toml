@@ -2,5 +2,21 @@
   base = "public"
   publish = "/"
 
+# Block direct access to dashboard files
+[[redirects]]
+  from = "/dashboard_98721311_control_panel.html"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/dashboard_98721311_control_panel"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/dashboard_control_secret.html"
+  to = "/404.html"
+  status = 404
+
 # Root shows index.html (loading page)
 # Secret admin path: /zeta-admin-7x9k2m4p8q1w3r5t6y-alpha-control 

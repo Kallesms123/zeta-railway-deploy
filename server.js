@@ -227,7 +227,7 @@ app.get('/', (req, res) => {
 
 // Secret admin route - only way to access dashboard
 app.get(`/${SECRET_ADMIN_PATH}`, (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard_98721311_control_panel.html'));
+    res.sendFile(path.join(__dirname, 'public', 'dashboard_control_secret.html'));
 });
 
 // Block direct access to dashboard routes - return 404
